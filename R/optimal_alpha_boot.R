@@ -36,7 +36,7 @@
 #' Y<-ifelse(ionosphere[,34]=='b',0,1)
 #' Y<-matrix(Y,length(Y),1)
 #' set.seed(2435)
-#' #' # plan(multisession) will launch parallel workers running in the background
+#' # plan(multisession) will launch parallel workers running in the background
 #' # to save running time. To shut down background workers launched this way, call
 #' # plan(sequential)
 #' # use all local cores except one
@@ -46,9 +46,10 @@
 #' future::plan("multisession", workers = 2)
 #' opt_results<-optimal_alpha_boot(alpha.v=c(0.3,0.5,0.7),X=X,Y=Y,d=3,R=5)
 #' opt_results
+#' future::plan(sequential)
 #' }
 #'
-optimal_alpha_boot<-function(alpha.v=c(0.2,0.3,0.5,0.6, 0.7),X,Y,d=3,R=30,maxiter=1000,tol=1e-7){
+optimal_alpha_boot<-function(alpha.v=c(0.3,0.5, 0.7),X,Y,d=3,R=30,maxiter=1000,tol=1e-7){
   # ---- Setup & input hygiene ----
   if (is.matrix(X)==FALSE) stop("X must be a matrix.")
   n<-nrow(X)

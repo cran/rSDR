@@ -50,6 +50,7 @@ rSDR <- function(X, Y, d, alpha=0.5,maxiter=1000,tol=1e-7) {
   p <- ncol(X)
 
   # Initial matrix C for the problem
+  # Initial C on Stiefel(p, d)
   # init is of size p x d
   init <- rstiefel::rustiefel(p, d)  # Generate a random orthonormal matrix (C'C=CC'=I) for initialization
 
@@ -58,35 +59,46 @@ rSDR <- function(X, Y, d, alpha=0.5,maxiter=1000,tol=1e-7) {
     stop("The dimension n must be larger than the dimension p.")
   }
 
-  # Pairwise euclidean distance nxn for response Y
+  # Pairwise distances for Y, then take alpha power
   PDY <- as.matrix(stats::dist(Y, method = "euclidean"))
   #update the power of euclidean distance
   KY <- PDY^alpha  # alpha = 1 for simplicity
-  B <- KY - rowMeans(KY) - colMeans(KY) + mean(KY) #B_kl in equation (3)
+
+  # FIX: double centering via H K H
+  H <- diag(n) - matrix(1, n, n) / n
+  B<-H%*%KY%*%H
+
+  # X covariance and its matrix sqrt and inverse sqrt, with ridge for stability
   N <- stats::cov(X)
-  N1 <- expm::sqrtm(N)
+  eig <- eigen(N, symmetric = TRUE)
+  lam <- pmax(eig$values, 1e-10)
+  Nhalf     <- eig$vectors %*% (diag(sqrt(lam), p, p)) %*% t(eig$vectors)
+  Nhalf_inv <- eig$vectors %*% (diag(1 / sqrt(lam), p, p)) %*% t(eig$vectors)
 
   # Standardize X
-  #Inv.sigma<-solve(N1)
-  Z <- X %*% solve(N1) #Z is n x d, X is nxp, solve(N1) is pxp.
+  Z <- X %*% Nhalf_inv   # n x p
 
   # Define cost function and gradient
   # Cost function
   cost_store <- function(C, Z, B, alpha, store = list()) {
-    ZC <- Z %*% C
+    ZC <- Z %*% C # n x d
     #ZC pairwise distance
-    PDZC <- as.matrix(stats::dist(ZC))
-    PDZC <- PDZC + diag(1, nrow(PDZC))
+    PDZC <- as.matrix(stats::dist(ZC)) # pairwise distances
     f <- -mean((PDZC^alpha) * B)
     store$PDZC <- PDZC
+    store$ZC   <- ZC
     return(list(f = f, store = store))
   }
 
   #gradient
   eGrad_store <- function(C, Z, B, alpha, store) {
     PDZC <- store$PDZC
-    coef <- alpha * (PDZC^2 + 1e-10)^((alpha - 2) / 2) * B
-    G <- -2 * t(Z) %*% ((diag(colSums(coef)) - coef) %*% Z %*% C) / n^2
+    # derivative of ||x||^alpha wrt x uses (||x||^2 + eps)^((alpha-2)/2)
+    eps <- 1e-10
+    coef <- alpha * (PDZC^2 + eps)^((alpha - 2) / 2) * B   # n x n
+    # Graph Laplacian style term: L = diag(colSums(coef)) - coef
+    L <- diag(colSums(coef)) - coef
+    G <- -2 * t(Z) %*% (L %*% Z %*% C) / (n^2)
     return(list(G = G, store = store))
   }
 
@@ -133,10 +145,10 @@ rSDR <- function(X, Y, d, alpha=0.5,maxiter=1000,tol=1e-7) {
   f_value<-result$fval
 
   ##Since C=sigma_x^(0.5)*beta, beta=sigma_x^(-0.5)%*%C from equation (4)
-  beta <- solve(N1) %*% C_value
+  beta <- Nhalf_inv %*% C_value
 
-  projected_data <- X %*% beta  # This projects X onto the estimated SDR directions
-  projected_data<-as.data.frame(projected_data)
+# This projects X onto the estimated SDR directions
+  projected_data<-as.data.frame(X %*% beta )
 
   # Return the result
   return(list(projected_data=projected_data,beta = beta,C_value=C_value,f_value=f_value))

@@ -44,7 +44,7 @@
 #' # use 2 cores for parallel
 #' \donttest{
 #' future::plan("multisession", workers = 2)
-#' opt_results<-optimal_alpha_cv(alpha.v=c(0.3, 0.5, 0.7),X=X,Y=Y,d=3,kfolds=10)
+#' opt_results<-optimal_alpha_cv(alpha.v=c(0.3, 0.5, 0.7),X=X,Y=Y,d=3,kfolds=5)
 #' opt_results
 #' }
 optimal_alpha_cv <- function(alpha.v=c(0.3,0.4,0.5,0.6,0.7), X, Y, d=3, kfolds = 10,
